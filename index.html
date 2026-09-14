@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Study Flow - AI Timetable & Focus Tracker</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.02); }
+    }
+    .animate-pulse-glow { animation: pulse-glow 2s infinite ease-in-out; }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+    }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 9999px; }
+  </style>
+</head>
+<body class="bg-[#0f172a] text-slate-100 min-h-screen flex flex-col font-sans antialiased">
+
+  <!-- TOP HEADER / NAVBAR -->
+  <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur px-6 py-4 flex flex-wrap justify-between items-center gap-4 sticky top-0 z-50 shadow-sm">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-xl shadow-md">
+        ⚡
+      </div>
+      <div>
+        <h1 class="font-extrabold text-xl tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+          Smart Study Flow
+        </h1>
+        <p class="text-xs text-slate-400 font-medium">AI Priority Timetable & Distraction-Aware Focus Tracker</p>
+      </div>
+    </div>
+
+    <!-- Quick Stats Header -->
+    <div class="flex items-center space-x-6 text-sm font-medium">
+      <div class="flex items-center space-x-2 bg-amber-500/10 text-amber-400 px-3 py-1.5 rounded-full border border-amber-500/20">
+        <span>🔥</span>
+        <span><strong id="headerStreak">5</strong> Day Streak</span>
+      </div>
+      <div class="flex items-center space-x-2 bg-emerald-500/10 text-emerald-400 px-3 py-1.5 rounded-full border border-emerald-500/20">
+        <span>🎯</span>
+        <span>Avg Focus: <strong id="headerFocusScore">92%</strong></span>
+      </div>
+      <div class="flex items-center space-x-2 bg-indigo-500/10 text-indigo-400 px-3 py-1.5 rounded-full border border-indigo-500/20">
+        <span>⏱️</span>
+        <span>Today: <strong id="headerTodayHours">3.5 hrs</strong></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN NAVIGATION TABS -->
+  <nav class="bg-slate-900 border-b border-slate-800 px-6 py-2 flex space-x-2 overflow-x-auto text-sm font-semibold">
+    <button onclick="switchTab('timetable')" id="tab-timetable" class="px-4 py-2 rounded-lg flex items-center space-x-2 transition-all bg-indigo-600 text-white shadow">
+      <span>📅</span><span>Auto Timetable Generator</span>
+    </button>
+    <button onclick="switchTab('pomodoro')" id="tab-pomodoro" class="px-4 py-2 rounded-lg flex items-center space-x-2 transition-all text-slate-400 hover:bg-slate-800">
+      <span>⏱️</span><span>Focus Mode (Pomodoro)</span>
+      <span id="activeTimerBadge" class="hidden w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+    </button>
+    <button onclick="switchTab('assignments')" id="tab-assignments" class="px-4 py-2 rounded-lg flex items-center space-x-2 transition-all text-slate-400 hover:bg-slate-800">
+      <span>📝</span><span>Deadlines & Assignments</span>
+      <span id="assignmentBadge" class="px-1.5 py-0.5 text-xs rounded-full bg-indigo-500/20 text-indigo-300">3</span>
+    </button>
+    <button onclick="switchTab('groups')" id="tab-groups" class="px-4 py-2 rounded-lg flex items-center space-x-2 transition-all text-slate-400 hover:bg-slate-800">
+      <span>👥</span><span>Group Study Rooms</span>
+      <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+    </button>
+    <button onclick="switchTab('analytics')" id="tab-analytics" class="px-4 py-2 rounded-lg flex items-center space-x-2 transition-all text-slate-400 hover:bg-slate-800">
+      <span>📊</span><span>Analytics & Streak</span>
+    </button>
+  </nav>
+
+  <!-- CONTENT CONTAINER -->
+  <main class="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
+
+    <!-- 1. AUTO TIMETABLE GENERATOR TAB -->
+    <section id="sec-timetable" class="space-y-6">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-slate-900/60 p-6 rounded-2xl border border-indigo-500/30">
+        <div>
+          <h2 class="text-2xl font-bold text-white flex items-center gap-2">
+            <span>🤖</span> Priority-Based Timetable Generator
+          </h2>
+          <p class="text-sm text-indigo-200 mt-1">
+            Calculates task urgency based on <code class="bg-indigo-950/80 px-2 py-0.5 rounded text-indigo-300">Urgency = (Difficulty × 10) ÷ Hours Remaining</code> and maps 25-min Pomodoro blocks automatically into your daily free hours.
+          </p>
+        </div>
+        <button onclick="generateSchedule()" class="px-5 py-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-xl shadow-lg hover:shadow-indigo-500/25 transition-all flex items-center gap-2 text-sm">
+          <span>✨</span> Generate Optimized Schedule
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Input Form / Free Time Slots -->
+        <div class="lg:col-span-1 space-y-6">
+          <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+            <h3 class="font-bold text-lg flex items-center gap-2">
+              <span>🕒</span> Available Daily Free Slots
+            </h3>
+            <p class="text-xs text-slate-400">Specify when you are free to study each day:</p>
+
+            <div id="freeSlotsList" class="space-y-2">
+              <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs">
+                <span class="font-semibold text-indigo-400">Weekday Evening</span>
+                <span>05:00 PM - 09:00 PM (4 hrs)</span>
+              </div>
+              <div class="flex items-center justify-between p-2.5 rounded-lg bg-slate-950 border border-slate-800 text-xs">
+                <span class="font-semibold text-indigo-400">Morning Slot</span>
+                <span>07:00 AM - 09:00 AM (2 hrs)</span>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-800 space-y-3">
+              <div class="grid grid-cols-2 gap-2 text-xs">
+                <div>
+                  <label class="block text-slate-400 mb-1">Start Time</label>
+                  <input type="time" id="slotStart" value="17:00" class="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white">
+                </div>
+                <div>
+                  <label class="block text-slate-400 mb-1">End Time</label>
+                  <input type="time" id="slotEnd" value="21:00" class="w-full bg-slate-950 border border-slate-800 rounded-md px-2 py-1.5 text-xs text-white">
+                </div>
+              </div>
+              <button onclick="addFreeSlot()" class="w-full py-2 bg-slate-800 hover:bg-indigo-600 hover:text-white rounded-lg text-xs font-semibold transition-all">
+                + Add Time Slot
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Assignment Summary for Scheduler -->
+          <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-3">
+            <div class="flex justify-between items-center">
+              <h3 class="font-bold text-sm flex items-center gap-2">
+                <span>📚</span> Pending Tasks for Schedule
+              </h3>
+              <span class="text-xs text-indigo-400 cursor-pointer" onclick="switchTab('assignments')">Manage →</span>
+            </div>
+            <div id="schedulerTasksList" class="space-y-2 text-xs">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Schedule Visual Timeline View -->
+        <div class="lg:col-span-2 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+          <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+            <div>
+              <h3 class="font-bold text-lg flex items-center gap-2">
+                <span>🗓️</span> Generated Study Schedule
+              </h3>
+              <p class="text-xs text-slate-400">Prioritized by deadline urgency & required Pomodoro blocks</p>
+            </div>
+            <div class="flex items-center space-x-2 text-xs">
+              <span class="px-2.5 py-1 rounded-md bg-rose-500/20 text-rose-300 font-semibold">🔴 High Urgency</span>
+              <span class="px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 font-semibold">🟡 Medium</span>
+              <span class="px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-300 font-semibold">🟢 Normal</span>
+            </div>
+          </div>
+
+          <!-- Timeline Grid Output -->
+          <div id="timetableOutput" class="space-y-4 min-h-[360px]">
+            <!-- Rendered by JS -->
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. POMODORO FOCUS MODE TAB WITH DISTRACTION TRACKER -->
+    <section id="sec-pomodoro" class="hidden space-y-6">
+      <!-- Distraction Alert Banner -->
+      <div id="distractionAlertBanner" class="hidden p-4 rounded-xl bg-rose-950/80 border-2 border-rose-500 text-rose-200 flex items-center justify-between animate-bounce shadow-lg">
+        <div class="flex items-center space-x-3">
+          <span class="text-2xl">⚠️</span>
+          <div>
+            <h4 class="font-bold text-sm text-rose-300">Distraction Alert Detected!</h4>
+            <p class="text-xs text-rose-200" id="distractionAlertText">You switched tabs/window during an active study session. Focus score decreased.</p>
+          </div>
+        </div>
+        <button onclick="dismissDistractionAlert()" class="text-xs bg-rose-900 hover:bg-rose-800 text-white px-3 py-1.5 rounded-lg border border-rose-700">
+          Acknowledge
+        </button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Main Pomodoro Timer Box -->
+        <div class="lg:col-span-2 bg-slate-900 p-8 rounded-3xl border border-slate-800 shadow-xl flex flex-col items-center justify-center text-center relative overflow-hidden">
+          
+          <!-- Background Subtle Gradient -->
+          <div class="absolute -right-20 -top-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+          <div class="absolute -left-20 -bottom-20 w-64 h-64 bg-pink-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <!-- Mode Selector Tabs -->
+          <div class="flex space-x-2 p-1.5 bg-slate-950 rounded-2xl border border-slate-800 mb-8 text-xs font-semibold">
+            <button onclick="setTimerMode('study')" id="mode-study" class="px-5 py-2 rounded-xl transition-all bg-indigo-600 text-white shadow">
+              🧠 Deep Study (25m)
+            </button>
+            <button onclick="setTimerMode('shortBreak')" id="mode-shortBreak" class="px-5 py-2 rounded-xl transition-all text-slate-400 hover:bg-slate-800">
+              ☕ Short Break (5m)
+            </button>
+            <button onclick="setTimerMode('longBreak')" id="mode-longBreak" class="px-5 py-2 rounded-xl transition-all text-slate-400 hover:bg-slate-800">
+              🌴 Long Break (15m)
+            </button>
+          </div>
+
+          <!-- Target Task Display -->
+          <div class="mb-4">
+            <span class="text-xs text-slate-400 uppercase tracking-wider font-semibold">Currently Focus Studying</span>
+            <h3 id="currentTimerTask" class="text-lg font-extrabold text-indigo-400 mt-0.5">CS301 Data Structures Assignment</h3>
+          </div>
+
+          <!-- Timer Clock Display -->
+          <div class="my-4 relative">
+            <div class="text-7xl md:text-8xl font-black tracking-tight font-mono text-transparent bg-clip-text bg-gradient-to-br from-indigo-300 via-purple-200 to-pink-300">
+              <span id="timerDisplay">25:00</span>
+            </div>
+            <div class="mt-2 text-xs text-slate-400 font-medium flex items-center justify-center gap-2">
+              <span id="timerStatusDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+              <span id="timerStatusText">Ready to start</span>
+            </div>
+          </div>
+
+          <!-- Timer Control Buttons -->
+          <div class="flex items-center space-x-4 mt-6">
+            <button onclick="toggleTimer()" id="btnTimerStart" class="px-8 py-3.5 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-extrabold text-base rounded-2xl shadow-lg hover:shadow-indigo-500/30 transition-all flex items-center space-x-2">
+              <span id="startIcon">▶</span>
+              <span id="startText">Start Focus Session</span>
+            </button>
+            <button onclick="resetTimer()" class="px-5 py-3.5 bg-slate-950 hover:bg-slate-800 text-white font-bold text-sm rounded-2xl border border-slate-800 transition-all">
+              🔄 Reset
+            </button>
+          </div>
+
+          <!-- Sound Toggle -->
+          <div class="mt-6 flex items-center space-x-2 text-xs text-slate-400">
+            <input type="checkbox" id="soundToggle" checked class="rounded accent-indigo-500">
+            <label for="soundToggle">Audio alerts on completion & distraction</label>
+          </div>
+        </div>
+
+        <!-- Real-time Distraction & Focus Score Tracker -->
+        <div class="space-y-6">
+          <!-- Focus Score Widget -->
+          <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+            <div class="flex justify-between items-center">
+              <h3 class="font-bold text-sm flex items-center gap-2">
+                <span>🎯</span> Session Focus Score
+              </h3>
+              <span id="distractionCountBadge" class="text-xs font-semibold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300">0 Distractions</span>
+            </div>
+
+            <div class="flex items-center space-x-4">
+              <div class="relative w-20 h-20 flex items-center justify-center rounded-full bg-indigo-950 border-4 border-indigo-500">
+                <span id="liveFocusScore" class="text-2xl font-black text-indigo-300">100%</span>
+              </div>
+              <div class="flex-1 text-xs space-y-1">
+                <p class="text-slate-400">Score drops by <strong>5%</strong> every time tab switch or window blur is detected during study.</p>
+                <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                  <div id="focusScoreBar" class="bg-gradient-to-r from-emerald-400 to-indigo-500 h-full w-full transition-all duration-500"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Real-Time Distraction Event Log -->
+          <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-3">
+            <h3 class="font-bold text-sm flex items-center gap-2">
+              <span>🚨</span> Live Distraction Audit Log
+            </h3>
+            <p class="text-xs text-slate-400">Automatic browser tab switch detection (`document.visibilityState`)</p>
+
+            <div id="distractionLogList" class="space-y-2 max-h-48 overflow-y-auto text-xs">
+              <div class="p-2.5 rounded-lg bg-slate-950 text-slate-400 text-center italic">
+                No distractions recorded yet in this session. Keep up the high focus! 🚀
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. ASSIGNMENT & DEADLINE TRACKER TAB -->
+    <section id="sec-assignments" class="hidden space-y-6">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm">
+        <div>
+          <h2 class="text-xl font-bold flex items-center gap-2">
+            <span>📝</span> All Courses Assignments & Deadlines
+          </h2>
+          <p class="text-xs text-slate-400">Add deadlines here; they instantly integrate into the AI Timetable Generator.</p>
+        </div>
+        <button onclick="toggleAddAssignmentModal()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all flex items-center gap-1.5 shadow">
+          <span>+</span> Add Assignment
+        </button>
+      </div>
+
+      <!-- Assignment Cards Grid -->
+      <div id="assignmentsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+
+    <!-- 4. GROUP STUDY ROOMS TAB -->
+    <section id="sec-groups" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Available Study Rooms List -->
+        <div class="lg:col-span-1 bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+          <h3 class="font-bold text-base flex items-center gap-2">
+            <span>🌐</span> Active Study Rooms
+          </h3>
+          <div class="space-y-3 text-xs">
+            <div onclick="selectRoom('CS Code Sprint')" class="p-3.5 rounded-xl bg-indigo-950/60 border-2 border-indigo-500 cursor-pointer space-y-1">
+              <div class="flex justify-between font-bold text-indigo-300">
+                <span>💻 CS Code Sprint</span>
+                <span class="text-emerald-400">● 4 Online</span>
+              </div>
+              <p class="text-slate-400">Algorithms & Data Structures grind</p>
+            </div>
+            <div onclick="selectRoom('Math & Physics Lab')" class="p-3.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 cursor-pointer space-y-1 transition-all">
+              <div class="flex justify-between font-bold">
+                <span>📐 Math & Physics Lab</span>
+                <span class="text-emerald-400">● 2 Online</span>
+              </div>
+              <p class="text-slate-400">Calculus problem sets & formulas</p>
+            </div>
+            <div onclick="selectRoom('Quiet Library')" class="p-3.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 cursor-pointer space-y-1 transition-all">
+              <div class="flex justify-between font-bold">
+                <span>📚 Quiet Silent Reading</span>
+                <span class="text-emerald-400">● 6 Online</span>
+              </div>
+              <p class="text-slate-400">Strict focus without chat distraction</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Room Interaction (Shared Synced Room & Chat) -->
+        <div class="lg:col-span-2 bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm flex flex-col justify-between space-y-6">
+          <div class="border-b border-slate-800 pb-4 flex justify-between items-center">
+            <div>
+              <h3 id="activeRoomTitle" class="font-extrabold text-lg text-indigo-400 flex items-center gap-2">
+                <span>💻</span> CS Code Sprint Room
+              </h3>
+              <p class="text-xs text-slate-400">Virtual Co-working space with shared Pomodoro timer & live study chat</p>
+            </div>
+            <div class="flex items-center space-x-2 text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-semibold">
+              <span>● Synced Timer: 18:42</span>
+            </div>
+          </div>
+
+          <!-- Active Peers Avatars -->
+          <div class="flex items-center space-x-3 bg-slate-950 p-3 rounded-xl border border-slate-800 overflow-x-auto text-xs">
+            <span class="text-slate-400 font-semibold">Studying with:</span>
+            <div class="flex items-center space-x-2">
+              <span class="px-2.5 py-1 rounded-lg bg-indigo-600/30 border border-indigo-500/40 text-indigo-200 font-medium">👨‍💻 Rohan (DSA)</span>
+              <span class="px-2.5 py-1 rounded-lg bg-purple-600/30 border border-purple-500/40 text-purple-200 font-medium">👩‍💻 Ananya (OS)</span>
+              <span class="px-2.5 py-1 rounded-lg bg-pink-600/30 border border-pink-500/40 text-pink-200 font-medium">🧑‍💻 Priya (Web Dev)</span>
+              <span class="px-2.5 py-1 rounded-lg bg-emerald-600/30 border border-emerald-500/40 text-emerald-200 font-medium">✨ You</span>
+            </div>
+          </div>
+
+          <!-- Live Chat Area -->
+          <div class="flex-1 bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 min-h-[220px] max-h-[260px] overflow-y-auto text-xs" id="groupChatContainer">
+            <div class="flex items-start space-x-2">
+              <span class="font-bold text-indigo-400">Rohan:</span>
+              <span class="bg-slate-900 p-2 rounded-lg border border-slate-800">Just completed 2 Pomodoros of Trees & Graphs! 🚀</span>
+            </div>
+            <div class="flex items-start space-x-2">
+              <span class="font-bold text-purple-400">Ananya:</span>
+              <span class="bg-slate-900 p-2 rounded-lg border border-slate-800">Break time guys! 5 mins break starts now.</span>
+            </div>
+          </div>
+
+          <!-- Chat Input -->
+          <div class="flex space-x-2">
+            <input type="text" id="chatInput" placeholder="Send motivational message or update to study group..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs text-white">
+            <button onclick="sendChatMessage()" class="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all">
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. PROGRESS ANALYTICS DASHBOARD TAB -->
+    <section id="sec-analytics" class="hidden space-y-6">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
+          <p class="text-xs text-slate-400">Total Study This Week</p>
+          <h4 class="text-2xl font-black text-indigo-400 mt-1">24.5 hrs</h4>
+          <span class="text-[10px] text-emerald-400 font-medium">↑ 18% vs last week</span>
+        </div>
+        <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
+          <p class="text-xs text-slate-400">Completed Pomodoros</p>
+          <h4 class="text-2xl font-black text-purple-400 mt-1">58 Blocks</h4>
+          <span class="text-[10px] text-indigo-400 font-medium">25 min each</span>
+        </div>
+        <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
+          <p class="text-xs text-slate-400">Average Focus Score</p>
+          <h4 class="text-2xl font-black text-emerald-400 mt-1">94%</h4>
+          <span class="text-[10px] text-emerald-400 font-medium">Low tab distractions</span>
+        </div>
+        <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
+          <p class="text-xs text-slate-400">Active Streak</p>
+          <h4 class="text-2xl font-black text-amber-400 mt-1">5 Days 🔥</h4>
+          <span class="text-[10px] text-amber-400 font-medium">Keep it going!</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Subject Time Distribution Chart -->
+        <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+          <h3 class="font-bold text-base flex items-center gap-2">
+            <span>📊</span> Time Allocation Per Subject (Hours)
+          </h3>
+          <div class="space-y-3 pt-2 text-xs">
+            <div>
+              <div class="flex justify-between font-semibold mb-1">
+                <span>CS301 Data Structures & Algorithms</span>
+                <span class="text-indigo-400">9.5 hrs (38%)</span>
+              </div>
+              <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+                <div class="bg-indigo-500 h-full w-[38%] rounded-full"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between font-semibold mb-1">
+                <span>MATH202 Linear Algebra</span>
+                <span class="text-purple-400">6.0 hrs (24%)</span>
+              </div>
+              <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+                <div class="bg-purple-500 h-full w-[24%] rounded-full"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between font-semibold mb-1">
+                <span>CS304 Operating Systems</span>
+                <span class="text-pink-400">5.0 hrs (20%)</span>
+              </div>
+              <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+                <div class="bg-pink-500 h-full w-[20%] rounded-full"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between font-semibold mb-1">
+                <span>ENG101 Technical Writing</span>
+                <span class="text-emerald-400">4.0 hrs (18%)</span>
+              </div>
+              <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden border border-slate-800">
+                <div class="bg-emerald-500 h-full w-[18%] rounded-full"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Badges & Achievements -->
+        <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+          <h3 class="font-bold text-base flex items-center gap-2">
+            <span>🏆</span> Focus Badges & Achievements
+          </h3>
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center space-x-3">
+              <span class="text-2xl">🔥</span>
+              <div>
+                <h4 class="font-bold text-amber-300">5-Day Warrior</h4>
+                <p class="text-[10px] text-slate-400">Studied 5 consecutive days</p>
+              </div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center space-x-3">
+              <span class="text-2xl">🎯</span>
+              <div>
+                <h4 class="font-bold text-indigo-300">Distraction Free</h4>
+                <p class="text-[10px] text-slate-400">100% score in 3 sessions</p>
+              </div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center space-x-3">
+              <span class="text-2xl">⚡</span>
+              <div>
+                <h4 class="font-bold text-emerald-300">Deadline Slayer</h4>
+                <p class="text-[10px] text-slate-400">Completed 5 tasks on time</p>
+              </div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center space-x-3">
+              <span class="text-2xl">👥</span>
+              <div>
+                <h4 class="font-bold text-purple-300">Group Scholar</h4>
+                <p class="text-[10px] text-slate-400">Joined 4 group sessions</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL: ADD ASSIGNMENT -->
+  <div id="addAssignmentModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="font-bold text-lg">Add New Assignment</h3>
+        <button onclick="toggleAddAssignmentModal()" class="text-xs text-slate-400 hover:text-white">✕ Close</button>
+      </div>
+
+      <form onsubmit="handleAddAssignment(event)" class="space-y-3 text-xs">
+        <div>
+          <label class="block mb-1 font-semibold">Course / Subject Title</label>
+          <input type="text" id="assignTitle" required placeholder="e.g. CS301 Binary Search Trees" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block mb-1 font-semibold">Due Date</label>
+            <input type="date" id="assignDueDate" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white">
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">Est. Hours</label>
+            <input type="number" id="assignHours" min="1" max="50" value="4" required class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white">
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block mb-1 font-semibold">Difficulty Weight</label>
+            <select id="assignDifficulty" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white">
+              <option value="3">🔥 High (Hard)</option>
+              <option value="2" selected>⚡ Medium</option>
+              <option value="1">🌱 Easy</option>
+            </select>
+          </div>
+          <div>
+            <label class="block mb-1 font-semibold">Priority Tag</label>
+            <select id="assignPriority" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-white">
+              <option value="high">🔴 High Urgency</option>
+              <option value="medium" selected>🟡 Medium</option>
+              <option value="normal">🟢 Normal</option>
+            </select>
+          </div>
+        </div>
+
+        <button type="submit" class="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs transition-all shadow-md mt-2">
+          Save Assignment & Sync Timetable
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT APPLICATION LOGIC -->
+  <script>
+    let assignments = JSON.parse(localStorage.getItem('ssf_assignments')) || [
+      { id: 1, title: 'CS301 Data Structures Trees Assignment', course: 'CS301', dueDate: getFutureDate(2), hoursNeeded: 5, difficulty: 3, priority: 'high', status: 'pending' },
+      { id: 2, title: 'MATH202 Vector Spaces Problem Set', course: 'MATH202', dueDate: getFutureDate(4), hoursNeeded: 3, difficulty: 2, priority: 'medium', status: 'pending' },
+      { id: 3, title: 'CS304 Operating Systems Process Lab', course: 'CS304', dueDate: getFutureDate(6), hoursNeeded: 4, difficulty: 3, priority: 'medium', status: 'pending' },
+      { id: 4, title: 'ENG101 Technical Essay Draft', course: 'ENG101', dueDate: getFutureDate(8), hoursNeeded: 2, difficulty: 1, priority: 'normal', status: 'completed' }
+    ];
+
+    let timerState = {
+      mode: 'study',
+      secondsLeft: 25 * 60,
+      totalSeconds: 25 * 60,
+      isRunning: false,
+      intervalId: null,
+      distractions: 0,
+      focusScore: 100,
+      targetTask: 'CS301 Data Structures Trees Assignment'
+    };
+
+    let freeSlots = [
+      { id: 1, label: 'Weekday Evening', start: '17:00', end: '21:00', totalHours: 4 }
+    ];
+
+    function getFutureDate(daysFromNow) {
+      const d = new Date();
+      d.setDate(d.getDate() + daysFromNow);
+      return d.toISOString().split('T')[0];
+    }
+
+    function switchTab(tabId) {
+      const tabs = ['timetable', 'pomodoro', 'assignments', 'groups', 'analytics'];
+      tabs.forEach(t => {
+        const sec = document.getElementById(`sec-${t}`);
+        const tabBtn = document.getElementById(`tab-${t}`);
+        if (t === tabId) {
+          sec.classList.remove('hidden');
+          tabBtn.className = 'px-4 py-2 rounded-lg flex items-center space-x-2 transition-all bg-indigo-600 text-white shadow font-semibold';
+        } else {
+          sec.classList.add('hidden');
+          tabBtn.className = 'px-4 py-2 rounded-lg flex items-center space-x-2 transition-all text-slate-400 hover:bg-slate-800 font-semibold';
+        }
+      });
+    }
+
+    function generateSchedule() {
+      const container = document.getElementById('timetableOutput');
+      container.innerHTML = '';
+
+      const now = new Date();
+      const scoredAssignments = assignments.filter(a => a.status !== 'completed').map(a => {
+        const due = new Date(a.dueDate);
+        const hoursUntilDue = Math.max(1, (due - now) / (1000 * 60 * 60));
+        const urgencyScore = (a.difficulty * 10) / hoursUntilDue;
+        const pomodorosNeeded = Math.ceil((a.hoursNeeded * 60) / 25);
+        return { ...a, urgencyScore, pomodorosNeeded };
+      });
+
+      scoredAssignments.sort((a, b) => b.urgencyScore - a.urgencyScore);
+
+      if (scoredAssignments.length === 0) {
+        container.innerHTML = `<div class="text-center p-8 text-xs text-slate-400">No pending assignments! All caught up.</div>`;
+        return;
+      }
+
+      const days = ['Today (Day 1)', 'Tomorrow (Day 2)', 'Day 3'];
+      let taskIdx = 0;
+
+      days.forEach((dayLabel, dIndex) => {
+        const dayCard = document.createElement('div');
+        dayCard.className = 'p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-3';
+        
+        let dayHtml = `
+          <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+            <span class="font-bold text-xs text-indigo-400">${dayLabel} - Target Session (05:00 PM - 09:00 PM)</span>
+            <span class="text-[10px] bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded">4 Pomodoro Blocks</span>
+          </div>
+          <div class="space-y-2 text-xs">
+        `;
+
+        for (let block = 0; block < 3; block++) {
+          if (scoredAssignments.length > 0) {
+            const task = scoredAssignments[taskIdx % scoredAssignments.length];
+            const isHigh = task.urgencyScore > 0.5 || task.priority === 'high';
+            const urgencyBadge = isHigh ? '🔴 High Priority' : (task.priority === 'medium' ? '🟡 Medium' : '🟢 Normal');
+            const bgBadge = isHigh ? 'border-rose-500/30 bg-rose-500/10' : 'border-indigo-500/30 bg-indigo-500/10';
+
+            const startTime = 17 + block;
+            const timeStr = `${startTime}:00 - ${startTime}:45 PM`;
+
+            dayHtml += `
+              <div class="p-3 rounded-lg border ${bgBadge} flex justify-between items-center">
+                <div class="space-y-0.5">
+                  <div class="flex items-center space-x-2">
+                    <span class="font-bold text-white">${task.title}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-semibold bg-black/40">${urgencyBadge}</span>
+                  </div>
+                  <div class="text-[10px] text-slate-400">
+                    ⏰ Slot: <strong>${timeStr}</strong> • Est: 25m Focus + 5m Break
+                  </div>
+                </div>
+                <button onclick="startFocusForTask('${task.title}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-[10px] font-bold shadow">
+                  ▶ Start Focus
+                </button>
+              </div>
+            `;
+            taskIdx++;
+          }
+        }
+
+        dayHtml += `</div>`;
+        dayCard.innerHTML = dayHtml;
+        container.appendChild(dayCard);
+      });
+    }
+
+    function renderSchedulerTaskList() {
+      const el = document.getElementById('schedulerTasksList');
+      el.innerHTML = assignments.filter(a => a.status !== 'completed').map(a => `
+        <div class="flex justify-between items-center p-2 rounded bg-slate-950 border border-slate-800">
+          <span class="truncate max-w-[140px] font-medium">${a.title}</span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-semibold">${a.hoursNeeded}h needed</span>
+        </div>
+      `).join('');
+    }
+
+    function addFreeSlot() {
+      const start = document.getElementById('slotStart').value;
+      const end = document.getElementById('slotEnd').value;
+      if (start && end) {
+        freeSlots.push({ id: Date.now(), label: 'Custom Slot', start, end, totalHours: 2 });
+        alert('New time slot added! Timetable will include this slot on next generate.');
+      }
+    }
+
+    function setTimerMode(mode) {
+      timerState.mode = mode;
+      if (mode === 'study') timerState.totalSeconds = 25 * 60;
+      else if (mode === 'shortBreak') timerState.totalSeconds = 5 * 60;
+      else if (mode === 'longBreak') timerState.totalSeconds = 15 * 60;
+
+      timerState.secondsLeft = timerState.totalSeconds;
+      updateTimerDisplay();
+
+      ['study', 'shortBreak', 'longBreak'].forEach(m => {
+        const btn = document.getElementById(`mode-${m}`);
+        if (m === mode) btn.className = 'px-5 py-2 rounded-xl transition-all bg-indigo-600 text-white shadow';
+        else btn.className = 'px-5 py-2 rounded-xl transition-all text-slate-400 hover:bg-slate-800';
+      });
+    }
+
+    function toggleTimer() {
+      if (timerState.isRunning) {
+        pauseTimer();
+      } else {
+        startTimer();
+      }
+    }
+
+    function startTimer() {
+      timerState.isRunning = true;
+      document.getElementById('startText').innerText = 'Pause Focus';
+      document.getElementById('startIcon').innerText = '⏸';
+      document.getElementById('timerStatusDot').className = 'w-2 h-2 rounded-full bg-emerald-500 animate-ping';
+      document.getElementById('timerStatusText').innerText = 'Session in progress - Stay focused!';
+      document.getElementById('activeTimerBadge').classList.remove('hidden');
+
+      timerState.intervalId = setInterval(() => {
+        if (timerState.secondsLeft > 0) {
+          timerState.secondsLeft--;
+          updateTimerDisplay();
+        } else {
+          completeTimer();
+        }
+      }, 1000);
+    }
+
+    function pauseTimer() {
+      timerState.isRunning = false;
+      clearInterval(timerState.intervalId);
+      document.getElementById('startText').innerText = 'Resume Focus';
+      document.getElementById('startIcon').innerText = '▶';
+      document.getElementById('timerStatusDot').className = 'w-2 h-2 rounded-full bg-amber-500';
+      document.getElementById('timerStatusText').innerText = 'Session paused';
+      document.getElementById('activeTimerBadge').classList.add('hidden');
+    }
+
+    function resetTimer() {
+      pauseTimer();
+      timerState.secondsLeft = timerState.totalSeconds;
+      timerState.distractions = 0;
+      timerState.focusScore = 100;
+      updateTimerDisplay();
+      updateFocusScoreDisplay();
+      document.getElementById('distractionLogList').innerHTML = `<div class="p-2.5 rounded-lg bg-slate-950 text-slate-400 text-center italic">No distractions recorded yet in this session. Keep up the high focus! 🚀</div>`;
+      document.getElementById('timerStatusText').innerText = 'Ready to start';
+    }
+
+    function completeTimer() {
+      pauseTimer();
+      playAudioAlert(880, 'sine', 0.5);
+      alert('🎉 Pomodoro Session Completed! Great job focusing.');
+    }
+
+    function updateTimerDisplay() {
+      const mins = Math.floor(timerState.secondsLeft / 60).toString().padStart(2, '0');
+      const secs = (timerState.secondsLeft % 60).toString().padStart(2, '0');
+      document.getElementById('timerDisplay').innerText = `${mins}:${secs}`;
+    }
+
+    function startFocusForTask(taskTitle) {
+      timerState.targetTask = taskTitle;
+      document.getElementById('currentTimerTask').innerText = taskTitle;
+      switchTab('pomodoro');
+      resetTimer();
+      startTimer();
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && timerState.isRunning && timerState.mode === 'study') {
+        registerDistraction('Tab switch / Window minimized detected');
+      }
+    });
+
+    window.addEventListener('blur', () => {
+      if (timerState.isRunning && timerState.mode === 'study') {
+        registerDistraction('Window lost focus');
+      }
+    });
+
+    function registerDistraction(reason) {
+      timerState.distractions++;
+      timerState.focusScore = Math.max(0, 100 - (timerState.distractions * 5));
+      updateFocusScoreDisplay();
+
+      const logList = document.getElementById('distractionLogList');
+      if (timerState.distractions === 1) logList.innerHTML = '';
+
+      const timeStr = new Date().toLocaleTimeString();
+      const item = document.createElement('div');
+      item.className = 'p-2 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-300 font-medium flex justify-between items-center';
+      item.innerHTML = `
+        <span>⚠️ ${reason}</span>
+        <span class="text-[10px] text-rose-400 font-mono">${timeStr}</span>
+      `;
+      logList.prepend(item);
+
+      document.getElementById('distractionAlertBanner').classList.remove('hidden');
+      document.getElementById('distractionAlertText').innerText = `${reason} at ${timeStr}. Focus Score dropped to ${timerState.focusScore}%.`;
+
+      playAudioAlert(300, 'square', 0.2);
+    }
+
+    function dismissDistractionAlert() {
+      document.getElementById('distractionAlertBanner').classList.add('hidden');
+    }
+
+    function updateFocusScoreDisplay() {
+      document.getElementById('liveFocusScore').innerText = `${timerState.focusScore}%`;
+      document.getElementById('focusScoreBar').style.width = `${timerState.focusScore}%`;
+      document.getElementById('distractionCountBadge').innerText = `${timerState.distractions} Distractions`;
+      document.getElementById('headerFocusScore').innerText = `${timerState.focusScore}%`;
+    }
+
+    function playAudioAlert(freq = 440, type = 'sine', duration = 0.3) {
+      if (!document.getElementById('soundToggle').checked) return;
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + duration);
+        osc.stop(ctx.currentTime + duration);
+      } catch (e) {
+        console.log('Audio API blocked until interaction');
+      }
+    }
+
+    function renderAssignments() {
+      const grid = document.getElementById('assignmentsGrid');
+      grid.innerHTML = assignments.map(a => {
+        const isDone = a.status === 'completed';
+        const badgeColor = a.priority === 'high' ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' : (a.priority === 'medium' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30');
+
+        return `
+          <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm flex flex-col justify-between space-y-4">
+            <div class="space-y-2">
+              <div class="flex justify-between items-start">
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeColor} uppercase">${a.priority} Urgency</span>
+                <span class="text-xs text-slate-400 font-mono">Due: ${a.dueDate}</span>
+              </div>
+              <h4 class="font-bold text-base ${isDone ? 'line-through text-slate-400' : 'text-white'}">${a.title}</h4>
+              <p class="text-xs text-slate-400">Course: <strong class="text-indigo-400">${a.course}</strong> • Est: ${a.hoursNeeded} Hours</p>
+            </div>
+            
+            <div class="flex items-center justify-between pt-3 border-t border-slate-800 text-xs">
+              <button onclick="toggleAssignmentStatus(${a.id})" class="px-3 py-1.5 rounded-lg border border-slate-800 font-semibold transition-all ${isDone ? 'bg-emerald-600 text-white' : 'hover:bg-slate-800'}">
+                ${isDone ? '✓ Completed' : 'Mark Done'}
+              </button>
+              <button onclick="startFocusForTask('${a.title}')" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-all">
+                Study Now
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('assignmentBadge').innerText = assignments.filter(a => a.status !== 'completed').length;
+      renderSchedulerTaskList();
+    }
+
+    function toggleAssignmentStatus(id) {
+      assignments = assignments.map(a => a.id === id ? { ...a, status: a.status === 'completed' ? 'pending' : 'completed' } : a);
+      localStorage.setItem('ssf_assignments', JSON.stringify(assignments));
+      renderAssignments();
+      generateSchedule();
+    }
+
+    function toggleAddAssignmentModal() {
+      document.getElementById('addAssignmentModal').classList.toggle('hidden');
+    }
+
+    function handleAddAssignment(e) {
+      e.preventDefault();
+      const title = document.getElementById('assignTitle').value;
+      const dueDate = document.getElementById('assignDueDate').value;
+      const hoursNeeded = parseInt(document.getElementById('assignHours').value);
+      const difficulty = parseInt(document.getElementById('assignDifficulty').value);
+      const priority = document.getElementById('assignPriority').value;
+
+      assignments.push({
+        id: Date.now(),
+        title,
+        course: title.split(' ')[0] || 'General',
+        dueDate,
+        hoursNeeded,
+        difficulty,
+        priority,
+        status: 'pending'
+      });
+
+      localStorage.setItem('ssf_assignments', JSON.stringify(assignments));
+      toggleAddAssignmentModal();
+      renderAssignments();
+      generateSchedule();
+    }
+
+    function selectRoom(roomName) {
+      document.getElementById('activeRoomTitle').innerText = roomName;
+    }
+
+    function sendChatMessage() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      const container = document.getElementById('groupChatContainer');
+      const msg = document.createElement('div');
+      msg.className = 'flex items-start space-x-2 justify-end';
+      msg.innerHTML = `
+        <span class="bg-indigo-600 text-white p-2 rounded-lg text-xs">${text}</span>
+        <span class="font-bold text-emerald-400">You:</span>
+      `;
+      container.appendChild(msg);
+      input.value = '';
+      container.scrollTop = container.scrollHeight;
+    }
+
+    window.onload = function() {
+      renderAssignments();
+      generateSchedule();
+      renderSchedulerTaskList();
+      document.getElementById('assignDueDate').value = getFutureDate(3);
+    };
+  </script>
+</body>
+</html>
